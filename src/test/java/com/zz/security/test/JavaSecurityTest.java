@@ -123,6 +123,17 @@ public class JavaSecurityTest {
     }
 
     @Test
+    public void test_hash() throws Exception {
+        byte[] content = RandomUtils.nextBytes(100);
+
+        byte[] hash = JavaSecurity.hash(content, "MD5");
+        Assert.assertEquals(hash.length, 16);
+
+        hash = JavaSecurity.hash(content, "SHA256");
+        Assert.assertEquals(hash.length, 32);
+    }
+
+    @Test
     public void test_cert() throws Exception {
         Path certPath = Paths.get(getClass().getClassLoader().getResource("cert.crt").toURI());
         String rsaKeyPemContent = new String(Files.readAllBytes(Paths.get(getClass().getClassLoader().getResource("rsa.key").toURI())));
