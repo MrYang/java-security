@@ -19,3 +19,5 @@ out
 /gradle
 gradlew
 gradlew.bat
+
+/.vscode

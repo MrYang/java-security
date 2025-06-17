@@ -4,11 +4,14 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.pkcs.RSAPrivateKey;
 import org.bouncycastle.asn1.sec.ECPrivateKey;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.asn1.x9.X9ObjectIdentifiers;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -19,6 +22,8 @@ import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
@@ -34,6 +39,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.*;
+import java.util.Date;
 
 public class JavaSecurity {
 
@@ -214,12 +220,14 @@ public class JavaSecurity {
 
     /**
      * 从pem 文件中提取密钥对
+     * 
      * @param pemContent 以 '-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN EC PRIVATE KEY-----' 开头
      */
     public static KeyPair readKeyPairFromPKCS1Pem(String pemContent) throws Exception {
-        StringReader stringReader = new StringReader(pemContent);
-        Object parsed = new PEMParser(stringReader).readObject();
-        return new JcaPEMKeyConverter().getKeyPair((PEMKeyPair) parsed);
+        try (PEMParser pemParser = new PEMParser(new StringReader(pemContent))) {
+            Object parsed = pemParser.readObject();
+            return new JcaPEMKeyConverter().getKeyPair((PEMKeyPair) parsed);
+        }
     }
 
     /**
@@ -275,9 +283,10 @@ public class JavaSecurity {
      * @param pemContent 以 '-----BEGIN PRIVATE KEY-----' 开头
      */
     public static PrivateKey readPrivateKeyFromPKCS8Pem(String pemContent) throws Exception {
-        StringReader stringReader = new StringReader(pemContent);
-        Object parsed = new PEMParser(stringReader).readObject();
-        return new JcaPEMKeyConverter().getPrivateKey((PrivateKeyInfo) parsed);
+        try (PEMParser pemParser = new PEMParser(new StringReader(pemContent))) {
+            Object parsed = pemParser.readObject();
+            return new JcaPEMKeyConverter().getPrivateKey((PrivateKeyInfo) parsed);
+        }
     }
 
     /**
@@ -335,9 +344,10 @@ public class JavaSecurity {
     }
 
     public static X509Certificate readCertificate(String pemContent) throws Exception {
-        PEMParser parser = new PEMParser(new StringReader(pemContent));
-        X509CertificateHolder holder = (X509CertificateHolder) parser.readObject();
-        return new JcaX509CertificateConverter().getCertificate(holder);
+        try (PEMParser pemParser = new PEMParser(new StringReader(pemContent))) {
+            X509CertificateHolder holder = (X509CertificateHolder) pemParser.readObject();
+            return new JcaX509CertificateConverter().getCertificate(holder);
+        }
     }
 
     public static String writeCertificate(X509Certificate certificate) throws Exception {
@@ -348,4 +358,21 @@ public class JavaSecurity {
         return stringWriter.toString();
     }
 
+    public static X509Certificate createCertificate(Date notBefore, Date notAfter, String issuer,
+            String subject, PrivateKey issuerPrivateKey, PublicKey subjectPublicKey) throws Exception {
+        X500Name issuerName = new X500Name(issuer);
+        X500Name subjectName = new X500Name(subject);
+
+        X509v3CertificateBuilder certBuillder = new JcaX509v3CertificateBuilder(
+                issuerName,
+                BigInteger.valueOf(System.currentTimeMillis()),
+                notBefore,
+                notAfter,
+                subjectName,
+                subjectPublicKey);
+
+        ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(issuerPrivateKey);
+
+        return new JcaX509CertificateConverter().getCertificate(certBuillder.build(contentSigner));
+    }
 }
